@@ -32,7 +32,7 @@ var mobConfig = MobConfig{
 	BaseBranch:       getCurrentBranchName(),
 	RemoteName:       "origin",
 	WipCommitMessage: "mob next [ci-skip]",
-	MobNextStay:      false,
+	MobNextStay:      true,
 	VoiceCommand:     "say",
 	Debug:            false,
 }
@@ -71,6 +71,8 @@ func main() {
 	if command == "s" || command == "start" {
 		start(parameter)
 		status()
+	} else if command == "setup" {
+		setup()
 	} else if command == "n" || command == "next" {
 		next()
 	} else if command == "d" || command == "done" || command == "e" || command == "end" {
@@ -135,6 +137,79 @@ func start(parameter []string) {
 	git("fetch", "--prune")
 	git("pull", "--ff-only")
 
+	if len(parameter) > 1 {
+		mobConfig.WipBranch = parameter[1]
+	}
+
+	wipBranchSetup()
+
+	if len(parameter) > 0 {
+		timer := parameter[0]
+		startTimer(timer)
+	}
+
+	if len(parameter) > 1 && parameter[1] == "share" {
+		startZoomScreenshare()
+	}
+
+	if !fileExists(configFileName) {
+		writeConfigFile()
+	}
+}
+
+func setup() {
+	var inputValue string
+
+	sayInfo("Enter the wip branch name [default = " + mobConfig.WipBranch + "]:")
+	fmt.Scanf("%s", &inputValue)
+
+	if inputValue != "" {
+		mobConfig.WipBranch = inputValue
+		sayOkay("Wip Branch setted to " + mobConfig.WipBranch)
+	} else {
+		sayOkay("wip branch keeping default value = " + mobConfig.WipBranch)
+	}
+
+	sayInfo("Enter the base branch name [default = " + mobConfig.BaseBranch + "]:")
+	fmt.Scanf("%s", &inputValue)
+
+	if inputValue != "" {
+		mobConfig.BaseBranch = inputValue
+		sayOkay("Wip Branch setted to " + mobConfig.BaseBranch)
+	} else {
+		sayOkay("wip branch keeps the default value = " + mobConfig.BaseBranch)
+	}
+
+	sayInfo("Enter the remote name [default = " + mobConfig.RemoteName + "]:")
+	fmt.Scanf("%s", &inputValue)
+
+	if inputValue != "" {
+		mobConfig.RemoteName = inputValue
+		sayOkay("Wip Branch setted to " + mobConfig.RemoteName)
+	} else {
+		sayOkay("wip branch keeps the default value = " + mobConfig.RemoteName)
+	}
+
+	sayInfo("Enter the next staty config value [default = " + strconv.FormatBool(mobConfig.MobNextStay) + "]:")
+	fmt.Scanf("%s", &inputValue)
+
+	b, err := strconv.ParseBool(inputValue)
+
+	if (err != nil) && (b) {
+		mobConfig.MobNextStay = b
+		sayOkay("Next stay setted to " + strconv.FormatBool(mobConfig.MobNextStay))
+	} else {
+		sayOkay("Next stay keeps the default value = " + strconv.FormatBool(mobConfig.MobNextStay))
+	}
+
+	wipBranchSetup()
+	writeConfigFile()
+
+	sayInfo("done")
+
+}
+
+func wipBranchSetup() {
 	if hasMobbingBranch() && hasMobbingBranchOrigin() {
 		sayInfo("rejoining mob session")
 		if !isMobbing() {
@@ -162,19 +237,6 @@ func start(parameter []string) {
 		git("branch", mobConfig.WipBranch)
 		git("checkout", mobConfig.WipBranch)
 		git("push", "--set-upstream", mobConfig.RemoteName, mobConfig.WipBranch)
-	}
-
-	if len(parameter) > 0 {
-		timer := parameter[0]
-		startTimer(timer)
-	}
-
-	if len(parameter) > 1 && parameter[1] == "share" {
-		startZoomScreenshare()
-	}
-
-	if !fileExists(configFileName) {
-		writeConfigFile()
 	}
 }
 
