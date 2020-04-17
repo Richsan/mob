@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"runtime"
@@ -12,72 +14,55 @@ import (
 )
 
 const release = "0.0.2"
+const configFileName = "./.mob_config.json"
 
-var wipBranch = "mob-session"               // override with MOB_WIP_BRANCH environment variable
-var baseBranch = "master"                   // override with MOB_BASE_BRANCH environment variable
-var remoteName = "origin"                   // override with MOB_REMOTE_NAME environment variable
-var wipCommitMessage = "mob next [ci-skip]" // override with MOB_WIP_COMMIT_MESSAGE environment variable
-var mobNextStay = false                     // override with MOB_NEXT_STAY environment variable
-var voiceCommand = "say"                    // override with MOB_VOICE_COMMAND environment variable
-var debug = false                           // override with MOB_DEBUG environment variable
+type MobConfig struct {
+	WipBranch        string `json: "MobWipBranch"`
+	BaseBranch       string `json: "MobBaseBranch"`
+	RemoteName       string `json: "MobRemoteName"`
+	WipCommitMessage string `json: "MobWipCommitMessage"`
+	MobNextStay      bool   `json: "MobNextStay"`
+	VoiceCommand     string `json: "MobVoiceComand"`
+	Debug            bool   `json: "MobDebug"`
+}
+
+//Default config values
+var mobConfig = MobConfig{
+	WipBranch:        "mob-session",
+	BaseBranch:       getCurrentBranchName(),
+	RemoteName:       "origin",
+	WipCommitMessage: "mob next [ci-skip]",
+	MobNextStay:      false,
+	VoiceCommand:     "say",
+	Debug:            false,
+}
 
 func parseEnvironmentVariables() []string {
-	userBaseBranch, userBaseBranchSet := os.LookupEnv("MOB_BASE_BRANCH")
-	if userBaseBranchSet {
-		baseBranch = userBaseBranch
-		say("overriding MOB_BASE_BRANCH=" + baseBranch)
-	}
-	userWipBranch, userWipBranchSet := os.LookupEnv("MOB_WIP_BRANCH")
-	if userWipBranchSet {
-		wipBranch = userWipBranch
-		say("overriding MOB_WIP_BRANCH=" + wipBranch)
-	}
-	userRemoteName, userRemoteNameSet := os.LookupEnv("MOB_REMOTE_NAME")
-	if userRemoteNameSet {
-		remoteName = userRemoteName
-		say("overriding MOB_REMOTE_NAME=" + remoteName)
-	}
-	userWipCommitMessage, userWipCommitMessageSet := os.LookupEnv("MOB_WIP_COMMIT_MESSAGE")
-	if userWipCommitMessageSet {
-		wipCommitMessage = userWipCommitMessage
-		say("overriding MOB_WIP_COMMIT_MESSAGE=" + wipCommitMessage)
-	}
-	userMobVoiceCommand, userMobVoiceCommandSet := os.LookupEnv("MOB_VOICE_COMMAND")
-	if userMobVoiceCommandSet {
-		voiceCommand = userMobVoiceCommand
-		say("overriding MOB_VOICE_COMMAND=" + voiceCommand)
-	}
-	_, userMobDebugSet := os.LookupEnv("MOB_DEBUG")
-	if userMobDebugSet {
-		debug = true
-		say("overriding MOB_DEBUG=" + strconv.FormatBool(debug))
-	}
-	_, userMobNextStaySet := os.LookupEnv("MOB_NEXT_STAY")
-	if userMobNextStaySet {
-		mobNextStay = true
-		say("overriding MOB_NEXT_STAY=" + strconv.FormatBool(mobNextStay))
-	}
-
 	flagMobNextStaySet := flag.Bool("stay", false, "don't change back")
 	flagMobNextSSet := flag.Bool("s", false, "(shorthand)")
 
 	flag.Parse()
 
 	if *flagMobNextStaySet {
-		mobNextStay = true
+		mobConfig.MobNextStay = true
 	}
 	if *flagMobNextSSet {
-		mobNextStay = true
+		mobConfig.MobNextStay = true
 	}
 
 	return flag.Args()
 }
 
 func main() {
+
+	if fileExists(configFileName) {
+		readConfigFile()
+	}
+
 	args := parseEnvironmentVariables()
 	command := getCommand(args)
 	parameter := getParameters(args)
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println("Args '" + strings.Join(args, " ") + "'")
 		fmt.Println("command '" + command + "'")
 		fmt.Println("parameter '" + strings.Join(parameter, " ") + "'")
@@ -109,15 +94,15 @@ func main() {
 }
 
 func startTimer(timerInMinutes string) {
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println("Starting timer for " + timerInMinutes + " minutes")
 	}
 	timeoutInMinutes, _ := strconv.Atoi(timerInMinutes)
 	timeoutInSeconds := timeoutInMinutes * 60
 	timerInSeconds := strconv.Itoa(timeoutInSeconds)
 
-	command := exec.Command("sh", "-c", "( sleep "+timerInSeconds+" && "+voiceCommand+" \"mob next\" && (/usr/bin/osascript -e 'display notification \"mob next\"' || /usr/bin/notify-send \"mob next\")  & )")
-	if debug {
+	command := exec.Command("sh", "-c", "( sleep "+timerInSeconds+" && "+mobConfig.VoiceCommand+" \"mob next\" && (/usr/bin/osascript -e 'display notification \"mob next\"' || /usr/bin/notify-send \"mob next\")  & )")
+	if mobConfig.Debug {
 		fmt.Println(command.Args)
 	}
 	err := command.Start()
@@ -132,17 +117,17 @@ func startTimer(timerInMinutes string) {
 
 func reset() {
 	git("fetch", "--prune")
-	git("checkout", baseBranch)
+	git("checkout", mobConfig.BaseBranch)
 	if hasMobbingBranch() {
-		git("branch", "-D", wipBranch)
+		git("branch", "-D", mobConfig.WipBranch)
 	}
 	if hasMobbingBranchOrigin() {
-		git("push", remoteName, "--delete", wipBranch)
+		git("push", mobConfig.RemoteName, "--delete", mobConfig.WipBranch)
 	}
 }
 
 func start(parameter []string) {
-	if !isNothingToCommit() {
+	if isSomethingToCommit() {
 		sayNote("uncommitted changes")
 		return
 	}
@@ -153,30 +138,30 @@ func start(parameter []string) {
 	if hasMobbingBranch() && hasMobbingBranchOrigin() {
 		sayInfo("rejoining mob session")
 		if !isMobbing() {
-			git("branch", "-D", wipBranch)
-			git("checkout", wipBranch)
-			git("branch", "--set-upstream-to="+remoteName+"/"+wipBranch, wipBranch)
+			git("branch", "-D", mobConfig.WipBranch)
+			git("checkout", mobConfig.WipBranch)
+			git("branch", "--set-upstream-to="+mobConfig.RemoteName+"/"+mobConfig.WipBranch, mobConfig.WipBranch)
 		}
 	} else if !hasMobbingBranch() && !hasMobbingBranchOrigin() {
-		sayInfo("create " + wipBranch + " from " + baseBranch)
-		git("checkout", baseBranch)
-		git("merge", remoteName+"/"+baseBranch, "--ff-only")
-		git("branch", wipBranch)
-		git("checkout", wipBranch)
-		git("push", "--set-upstream", remoteName, wipBranch)
+		sayInfo("create " + mobConfig.WipBranch + " from " + mobConfig.BaseBranch)
+		git("checkout", mobConfig.BaseBranch)
+		git("merge", mobConfig.RemoteName+"/"+mobConfig.BaseBranch, "--ff-only")
+		git("branch", mobConfig.WipBranch)
+		git("checkout", mobConfig.WipBranch)
+		git("push", "--set-upstream", mobConfig.RemoteName, mobConfig.WipBranch)
 	} else if !hasMobbingBranch() && hasMobbingBranchOrigin() {
 		sayInfo("joining mob session")
-		git("checkout", wipBranch)
-		git("branch", "--set-upstream-to="+remoteName+"/"+wipBranch, wipBranch)
+		git("checkout", mobConfig.WipBranch)
+		git("branch", "--set-upstream-to="+mobConfig.RemoteName+"/"+mobConfig.WipBranch, mobConfig.WipBranch)
 	} else {
-		sayInfo("purging local branch and start new " + wipBranch + " branch from " + baseBranch)
-		git("branch", "-D", wipBranch) // check if unmerged commits
+		sayInfo("purging local branch and start new " + mobConfig.WipBranch + " branch from " + mobConfig.BaseBranch)
+		git("branch", "-D", mobConfig.WipBranch) // check if unmerged commits
 
-		git("checkout", baseBranch)
-		git("merge", remoteName+"/"+baseBranch, "--ff-only")
-		git("branch", wipBranch)
-		git("checkout", wipBranch)
-		git("push", "--set-upstream", remoteName, wipBranch)
+		git("checkout", mobConfig.BaseBranch)
+		git("merge", mobConfig.RemoteName+"/"+mobConfig.BaseBranch, "--ff-only")
+		git("branch", mobConfig.WipBranch)
+		git("checkout", mobConfig.WipBranch)
+		git("push", "--set-upstream", mobConfig.RemoteName, mobConfig.WipBranch)
 	}
 
 	if len(parameter) > 0 {
@@ -186,6 +171,10 @@ func start(parameter []string) {
 
 	if len(parameter) > 1 && parameter[1] == "share" {
 		startZoomScreenshare()
+	}
+
+	if !fileExists(configFileName) {
+		writeConfigFile()
 	}
 }
 
@@ -199,7 +188,7 @@ func startZoomScreenshare() {
 
 	command := exec.Command("sh", "-c", commandStr)
 
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println(command.Args)
 	}
 	err := command.Start()
@@ -221,19 +210,19 @@ func next() {
 		return
 	}
 
-	if isNothingToCommit() {
+	if !isSomethingToCommit() {
 		sayInfo("nothing was done, so nothing to commit")
 	} else {
 		git("add", "--all")
-		git("commit", "--message", "\""+wipCommitMessage+"\"", "--no-verify")
+		git("commit", "--message", "\""+mobConfig.WipCommitMessage+"\"", "--no-verify")
 		changes := getChangesOfLastCommit()
-		git("push", remoteName, wipBranch)
+		git("push", mobConfig.RemoteName, mobConfig.WipBranch)
 		say(changes)
 	}
 	showNext()
 
-	if !mobNextStay {
-		git("checkout", baseBranch)
+	if !mobConfig.MobNextStay {
+		git("checkout", mobConfig.BaseBranch)
 	}
 }
 
@@ -254,79 +243,85 @@ func done() {
 	git("fetch", "--prune")
 
 	if hasMobbingBranchOrigin() {
-		if !isNothingToCommit() {
+		if isSomethingToCommit() {
 			git("add", "--all")
-			git("commit", "--message", "\""+wipCommitMessage+"\"", "--no-verify")
+			git("commit", "--message", "\""+mobConfig.WipCommitMessage+"\"", "--no-verify")
 		}
-		git("push", remoteName, wipBranch)
+		git("push", mobConfig.RemoteName, mobConfig.WipBranch)
 
-		git("checkout", baseBranch)
-		git("merge", remoteName+"/"+baseBranch, "--ff-only")
-		git("merge", "--squash", "--ff", wipBranch)
+		git("checkout", mobConfig.BaseBranch)
+		git("merge", mobConfig.RemoteName+"/"+mobConfig.BaseBranch, "--ff-only")
+		git("merge", "--squash", "--ff", mobConfig.WipBranch)
 
-		git("branch", "-D", wipBranch)
-		git("push", remoteName, "--delete", wipBranch)
+		git("branch", "-D", mobConfig.WipBranch)
+		git("push", mobConfig.RemoteName, "--delete", mobConfig.WipBranch)
 		say(getCachedChanges())
 		sayTodo("git commit -m 'describe the changes'")
 	} else {
-		git("checkout", baseBranch)
-		git("branch", "-D", wipBranch)
+		git("checkout", mobConfig.BaseBranch)
+		git("branch", "-D", mobConfig.WipBranch)
 		sayInfo("someone else already ended your mob session")
 	}
+
+	git("rm", configFileName)
+	sayInfo("mob config file removed")
 }
 
 func status() {
 	if isMobbing() {
 		sayInfo("mobbing in progress")
 
-		output := silentgit("--no-pager", "log", baseBranch+".."+wipBranch, "--pretty=format:%h %cr <%an>", "--abbrev-commit")
+		output := silentgit("--no-pager", "log", mobConfig.BaseBranch+".."+mobConfig.WipBranch, "--pretty=format:%h %cr <%an>", "--abbrev-commit")
 		say(output)
 	} else {
 		sayInfo("you aren't mobbing right now")
 	}
 
 	if !hasSay() {
-		sayNote("text-to-speech disabled because '" + voiceCommand + "' not found")
+		sayNote("text-to-speech disabled because '" + mobConfig.VoiceCommand + "' not found")
 	}
 }
 
-func isNothingToCommit() bool {
+func isSomethingToCommit() bool {
 	output := silentgit("status", "--short")
-	isMobbing := len(strings.TrimSpace(output)) == 0
-	return isMobbing
+	return len(strings.TrimSpace(output)) != 0
 }
 
 func isMobbing() bool {
 	output := silentgit("branch")
-	return strings.Contains(output, "* "+wipBranch)
+	return strings.Contains(output, "* "+mobConfig.WipBranch)
 }
 
 func hasMobbingBranch() bool {
 	output := silentgit("branch")
-	return strings.Contains(output, "  "+wipBranch) || strings.Contains(output, "* "+wipBranch)
+	return strings.Contains(output, "  "+mobConfig.WipBranch) || strings.Contains(output, "* "+mobConfig.WipBranch)
 }
 
 func hasMobbingBranchOrigin() bool {
 	output := silentgit("branch", "--remotes")
-	return strings.Contains(output, "  "+remoteName+"/"+wipBranch)
+	return strings.Contains(output, "  "+mobConfig.RemoteName+"/"+mobConfig.WipBranch)
 }
 
 func getGitUserName() string {
 	return strings.TrimSpace(silentgit("config", "--get", "user.name"))
 }
 
+func getCurrentBranchName() string {
+	return silentgit("rev-parse", "--abbrev-ref", "HEAD")
+}
+
 func showNext() {
-	if debug {
+	if mobConfig.Debug {
 		say("determining next person based on previous changes")
 	}
-	changes := strings.TrimSpace(silentgit("--no-pager", "log", baseBranch+".."+wipBranch, "--pretty=format:%an", "--abbrev-commit"))
+	changes := strings.TrimSpace(silentgit("--no-pager", "log", mobConfig.BaseBranch+".."+mobConfig.WipBranch, "--pretty=format:%an", "--abbrev-commit"))
 	lines := strings.Split(strings.Replace(changes, "\r\n", "\n", -1), "\n")
 	numberOfLines := len(lines)
-	if debug {
+	if mobConfig.Debug {
 		say("there have been " + strconv.Itoa(numberOfLines) + " changes")
 	}
 	gitUserName := getGitUserName()
-	if debug {
+	if mobConfig.Debug {
 		say("current git user.name is '" + gitUserName + "'")
 	}
 	if numberOfLines < 1 {
@@ -371,14 +366,9 @@ func version() {
 
 func silentgit(args ...string) string {
 	command := exec.Command("git", args...)
-	if debug {
-		fmt.Println(command.Args)
-	}
 	outputBinary, err := command.CombinedOutput()
 	output := string(outputBinary)
-	if debug {
-		fmt.Println(output)
-	}
+
 	if err != nil {
 		fmt.Println(output)
 		fmt.Println(err)
@@ -388,13 +378,13 @@ func silentgit(args ...string) string {
 }
 
 func hasSay() bool {
-	command := exec.Command("which", voiceCommand)
-	if debug {
+	command := exec.Command("which", mobConfig.VoiceCommand)
+	if mobConfig.Debug {
 		fmt.Println(command.Args)
 	}
 	outputBinary, err := command.CombinedOutput()
 	output := string(outputBinary)
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println(output)
 	}
 	return err == nil
@@ -402,12 +392,12 @@ func hasSay() bool {
 
 func git(args ...string) string {
 	command := exec.Command("git", args...)
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println(command.Args)
 	}
 	outputBinary, err := command.CombinedOutput()
 	output := string(outputBinary)
-	if debug {
+	if mobConfig.Debug {
 		fmt.Println(output)
 	}
 	if err != nil {
@@ -466,4 +456,29 @@ func getParameters(args []string) []string {
 		return args
 	}
 	return args[1:]
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func readConfigFile() {
+	configFile, _ := ioutil.ReadFile(configFileName)
+	_ = json.Unmarshal([]byte(configFile), &mobConfig)
+
+	sayInfo(mobConfig.BaseBranch)
+}
+
+func writeConfigFile() {
+	sayInfo("creating default mob config file...")
+	configFile, _ := json.MarshalIndent(mobConfig, "", " ")
+	_ = ioutil.WriteFile(configFileName, configFile, 0644)
+	git("add", "--all")
+	git("commit", "--message", "mob started", "--no-verify")
+
+	sayOkay("default mob config file created")
 }
