@@ -161,37 +161,37 @@ func setup() {
 	var inputValue string
 
 	sayInfo("Enter the wip branch name [default = " + mobConfig.WipBranch + "]:")
-	fmt.Scanf("%s", &inputValue)
+	readStringTrillingNewLine(&inputValue)
 
 	if inputValue != "" {
 		mobConfig.WipBranch = inputValue
 		sayOkay("Wip Branch setted to " + mobConfig.WipBranch)
 	} else {
-		sayOkay("wip branch keeping default value = " + mobConfig.WipBranch)
+		sayOkay("wip branch keeps the default value = " + mobConfig.WipBranch)
 	}
 
 	sayInfo("Enter the base branch name [default = " + mobConfig.BaseBranch + "]:")
-	fmt.Scanf("%s", &inputValue)
+	readStringTrillingNewLine(&inputValue)
 
 	if inputValue != "" {
 		mobConfig.BaseBranch = inputValue
-		sayOkay("Wip Branch setted to " + mobConfig.BaseBranch)
+		sayOkay("Base Branch setted to " + mobConfig.BaseBranch)
 	} else {
-		sayOkay("wip branch keeps the default value = " + mobConfig.BaseBranch)
+		sayOkay("Base branch keeps the default value = " + mobConfig.BaseBranch)
 	}
 
 	sayInfo("Enter the remote name [default = " + mobConfig.RemoteName + "]:")
-	fmt.Scanf("%s", &inputValue)
+	readStringTrillingNewLine(&inputValue)
 
 	if inputValue != "" {
 		mobConfig.RemoteName = inputValue
-		sayOkay("Wip Branch setted to " + mobConfig.RemoteName)
+		sayOkay("Remote name setted to " + mobConfig.RemoteName)
 	} else {
-		sayOkay("wip branch keeps the default value = " + mobConfig.RemoteName)
+		sayOkay("Remote name keeps the default value = " + mobConfig.RemoteName)
 	}
 
 	sayInfo("Enter the next staty config value [default = " + strconv.FormatBool(mobConfig.MobNextStay) + "]:")
-	fmt.Scanf("%s", &inputValue)
+	readStringTrillingNewLine(&inputValue)
 
 	b, err := strconv.ParseBool(inputValue)
 
@@ -207,6 +207,11 @@ func setup() {
 
 	sayInfo("done")
 
+}
+
+func readStringTrillingNewLine(inputValue *string) {
+	fmt.Scanf("%s", &inputValue)
+	*inputValue = strings.TrimSuffix(*inputValue, "\n")
 }
 
 func wipBranchSetup() {
