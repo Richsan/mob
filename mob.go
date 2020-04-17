@@ -369,7 +369,7 @@ func getGitUserName() string {
 }
 
 func getCurrentBranchName() string {
-	return silentgit("rev-parse", "--abbrev-ref", "HEAD")
+	return strings.TrimSuffix(silentgit("rev-parse", "--abbrev-ref", "HEAD"), "\n")
 }
 
 func showNext() {
