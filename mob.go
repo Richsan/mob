@@ -210,7 +210,8 @@ func setup() {
 }
 
 func readStringTrillingNewLine(inputValue *string) {
-	fmt.Scanf("%s", &inputValue)
+	*inputValue = ""
+	fmt.Scanf("%s", inputValue)
 	*inputValue = strings.TrimSuffix(*inputValue, "\n")
 }
 
