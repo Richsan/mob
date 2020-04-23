@@ -227,7 +227,7 @@ func setup() {
 
 	b, err = strconv.ParseBool(inputValue)
 
-	if (err != nil) && (b) {
+	if (err == nil) && (b) {
 		mobConfig.Debug = b
 		sayOkay("Debug flag setted to " + strconv.FormatBool(mobConfig.Debug))
 	} else {
