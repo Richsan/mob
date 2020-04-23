@@ -14,7 +14,7 @@ import (
 )
 
 const release = "0.0.2"
-const configFileName = "./.mob_config.json"
+const configFileName = ".mob_config.json"
 
 type MobConfig struct {
 	WipBranch        string `json: "MobWipBranch"`
@@ -363,7 +363,7 @@ func done() {
 		sayInfo("someone else already ended your mob session")
 	}
 
-	git("rm", configFileName)
+	git("rm", "-f", configFileName)
 	sayInfo("mob config file removed")
 }
 
