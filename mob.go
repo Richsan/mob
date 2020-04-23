@@ -180,6 +180,16 @@ func setup() {
 		sayOkay("Base branch keeps the default value = " + mobConfig.BaseBranch)
 	}
 
+	sayInfo("Enter the wip commit message [default = " + mobConfig.WipCommitMessage + "]:")
+	readStringTrillingNewLine(&inputValue)
+
+	if inputValue != "" {
+		mobConfig.WipCommitMessage = inputValue
+		sayOkay("Wip commit message setted to " + mobConfig.WipCommitMessage)
+	} else {
+		sayOkay("Wip commit message keeps the default value = " + mobConfig.WipCommitMessage)
+	}
+
 	sayInfo("Enter the remote name [default = " + mobConfig.RemoteName + "]:")
 	readStringTrillingNewLine(&inputValue)
 
@@ -200,6 +210,28 @@ func setup() {
 		sayOkay("Next stay setted to " + strconv.FormatBool(mobConfig.MobNextStay))
 	} else {
 		sayOkay("Next stay keeps the default value = " + strconv.FormatBool(mobConfig.MobNextStay))
+	}
+
+	sayInfo("Enter the voice command [default = " + mobConfig.VoiceCommand + "]:")
+	readStringTrillingNewLine(&inputValue)
+
+	if inputValue != "" {
+		mobConfig.VoiceCommand = inputValue
+		sayOkay("Voice command setted to " + mobConfig.VoiceCommand)
+	} else {
+		sayOkay("Voice command keeps the default value = " + mobConfig.VoiceCommand)
+	}
+
+	sayInfo("Enter the debug flag [default = " + strconv.FormatBool(mobConfig.Debug) + "]:")
+	readStringTrillingNewLine(&inputValue)
+
+	b, err = strconv.ParseBool(inputValue)
+
+	if (err != nil) && (b) {
+		mobConfig.Debug = b
+		sayOkay("Debug flag setted to " + strconv.FormatBool(mobConfig.Debug))
+	} else {
+		sayOkay("Debug flag keeps the default value = " + strconv.FormatBool(mobConfig.Debug))
 	}
 
 	wipBranchSetup()
