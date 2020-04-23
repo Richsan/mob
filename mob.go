@@ -200,7 +200,7 @@ func setup() {
 		sayOkay("Remote name keeps the default value = " + mobConfig.RemoteName)
 	}
 
-	sayInfo("Enter the next staty config value [default = " + strconv.FormatBool(mobConfig.MobNextStay) + "]:")
+	sayInfo("Enter the next stay config value [default = " + strconv.FormatBool(mobConfig.MobNextStay) + "]:")
 	readStringTrillingNewLine(&inputValue)
 
 	b, err := strconv.ParseBool(inputValue)
